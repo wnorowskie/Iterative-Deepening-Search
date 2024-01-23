@@ -1,0 +1,177 @@
+;; =====================================
+;;  CMPU-365, Spring 2023
+;;  Extended IDS for different "value" functions
+;; =====================================
+
+
+;;  XEXPAND -- Similar to EXPAND from Asmt. 1
+;; -----------------------------------------------------------------
+;;   Takes a VALUE-FUNC as an input.  This function is used to compute
+;;      the value of a child-node immediately after it is created.
+;;      The VALUE-FUNC takes one input: an XNODE.  For IDS-UCS the
+;;      value function will be #'XNODE-COST (i.e., cost so far).  For
+;;      IDS-A* it will be F(n) = G(n) + H(n).  (More on this later.)
+;;      For plain old IDS it will be #'XNODE-DEPTH.
+
+;; (defstruct (xnode (:print-function print-xnode))
+;;  state
+;;  parent
+;;  action
+;;  (depth 0)
+;;  (cost 0)   ;; cost so far from root node
+;;  (value 0)  ;; value of this node (e.g., f(n) for A* search)
+;;  )
+
+;; (defstruct xproblem
+;;  init-state		
+;;  )
+
+
+
+(defun xexpand (xnode rezzy &key (value-func #'xnode-depth))
+  (labels (;; XEXPAND-ACC:  Recursive helper function that walks through the legal MOVES
+	   ;;               to create corresponding XNODES.  CHILDREN is the accumulator
+	   ;;               of child XNODES.
+	   (xexpand-acc (moves children)
+	     (cond
+	      ;; Case 1:  No more moves/actions to do
+	      ((null moves)
+	       ;; Increment the num-nodes field of REZZY (num
+	       (incf (results-num-nodes-generated rezzy) (length children))
+	       ;; Return the list of child nodes
+	       children)
+	      ;; Case 2:  More moves/actions to do
+	      (t
+		   ;; let move be first action struct of moves
+		   ;;     xs be the xnode-state
+		   ;;	  new-state be the child state based on move
+		   ;;     cost be the cost of recent move
+	       (let* ((move (car moves))
+		 		  (xs (do-move (xnode-state xnode) move))
+				  (new-state (first xs))
+				  (cost (rest xs)))
+			;; recursive call on the rest of the moves
+				(xexpand-acc (cdr moves)
+				;; add newest node to the accumulator
+					(cons (make-xnode :state new-state
+									  :parent xnode
+									  :action move
+									  :depth (1+ (xnode-depth xnode))
+									  :cost (+ cost (xnode-cost xnode))
+									  ;; get value based on value based on value-func on this node
+									  :value (funcall value-func (make-xnode  :state new-state
+																			  :parent xnode
+																			  :action move
+																			  :depth (1+ (xnode-depth xnode))
+																			  :cost (+ cost (xnode-cost xnode)))))
+                                      ;; acc
+									  children)))))))
+    ;;  Body of LABELS
+    (xexpand-acc (fetch-legal-moves (xnode-state xnode)) nil)))
+
+;;  XDLS:  Extended Depth-Limited Search (based on a VALUE-FUNC)
+;; ----------------------------------------------------------------------------
+;;  INPUTS:  XPROB, an XPROBLEM instance
+;;           LIMIT, specifies the cutoff value for the DLS
+;;           MASTER-REZZY, a results struct to record nodes generated
+;;           VALUE-FUNC, used to compute value of a node
+;;  OUTPUT:  One of the following:
+;;              An XNODE (i.e., a *GOAL* node)
+;;              NIL, search space exhausted without hitting cutoff LIMIT
+;;                no point in increasing the cutoff LIMIT
+;;              A number = the minimum value of the nodes that were generated
+;;                         but not explored (because their value was greater
+;;                         than the cutoff LIMIT).  Will be used as LIMIT for
+;;                         next iteration.
+
+(defun xdls (xprob limit master-rezzy &key (value-func #'xnode-depth))
+  (let (;; The ROOT node
+        (root (make-root-xnode xprob)))
+    (format t "XDLS with limit = ~A~%" limit)
+
+    ;;  XDLS-REC:  A recursive helper function that processes the sub-tree rooted at its input XNODE
+    ;; -----------------------------------------------------------------------------------------------
+    (labels ((xdls-rec (xnode limit)
+               (cond
+    ;; Return node if it is a goal state
+    ((xnode-state-is-goal-p xnode) xnode)
+    ;; Return nil if limit exceeded
+    ((> (xnode-value xnode) limit) (xnode-value xnode))
+    (t
+      ;; Expand node and sort children in non-decreasing order according to XNODE-VALUE
+      (let* ((children (sort (xexpand xnode master-rezzy :value-func value-func) #'< :key #'xnode-value))
+             (min-value-of-unexplored-children (xnode-value (car children)))
+             (result nil))
+        ;; Loop through each child node
+        (dolist (child children)
+          (let ((value (xdls-rec child limit)))
+            ;; If value is a node, return it
+            (when (typep value 'xnode) (return value))
+            ;; If value is a number, update the min-value-of-unexplored-children
+            (when (numberp value) (setf min-value-of-unexplored-children (min min-value-of-unexplored-children value))))
+        ;; Return min-value-of-unexplored-children if it exists and is less than limit
+        (when (and (numberp min-value-of-unexplored-children) (< min-value-of-unexplored-children limit))
+          min-value-of-unexplored-children)))))))
+
+      ;; Body of LABELS:  Call the XDLS-REC helper function on the ROOT node
+      (xdls-rec root limit))))
+
+	       
+	       ;; Remember:  Its the VALUE of a node that matters.
+	       ;;            Also, each domain is required to implement a
+	       ;;            STATE-IS-GOAL? method that you can use.
+	       ;;   Also, it is a good idea to SORT the list of nodes returned by XEXPAND
+	       ;;   so that the DFS explores the best child node first.
+	       ;;   The built-in SORT function can be called as follows:
+	       ;;      (sort list-o-children #'< :key #'xnode-value)
+	       ;;   which sorts LIST-O-CHILDREN in non-decreasing order according
+	       ;;   to the XNODE-VALUE of the nodes.
+	       ;;   
+	       ;;   Finally, need to deal with MIN-VALUE-OF-UNEXPLORED-CHILDREN as 
+	       ;;   described in the pseudocode seen in class.
+
+	
+      
+      ;; Body of LABELS:  Call the XDLS-REC helper function on the ROOT node
+
+;;  XIDS -- Extended Iterative Deepening Search (based on a VALUE-FUNC)
+;; -------------------------------------------------------------------------
+;;  INPUTS:  XPROB, an XPROBLEM struct
+;;           VALUE-FUNC, used to compute the value of each generated node
+;;  OUTPUT:  A goal node or NIL.
+
+(defun xids (xprob &key (value-func #'xnode-depth))
+  (let* (;; Initialize a RESULTS struct
+	 (master-rezzy (make-results :start-time (get-universal-time)))
+	 ;; First iteration calls XLDS with a LIMIT of 0 (i.e., will only explore root node)
+	 (xdls-answer (xdls xprob 0 master-rezzy :value-func value-func)))
+    ;; As long as XDLS hit the cutoff without finding a goal....
+    (while (and xdls-answer
+		(not (xnode-p xdls-answer)))
+      ;; It means that xdls-answer is a number:  MIN-VAL-UNEXPLORED-CHILD!
+      ;; Use that number as the cutoff for the next iteration:
+      (setf xdls-answer (xdls xprob xdls-answer master-rezzy :value-func value-func)))
+    ;; After the WHILE:
+    ;; Finish collecting info for the RESULTS struct
+    (setf (results-end-time master-rezzy) (get-universal-time))
+    (setf (results-elapsed-time master-rezzy) (- (results-end-time master-rezzy)
+						 (results-start-time master-rezzy)))
+    (setf (results-goal-node master-rezzy) xdls-answer)
+    ;; Return the RESULTS struct
+    master-rezzy))
+
+;;  XIDS-ASTAR
+;; ----------------------------------------------------
+;;  INPUTS:  XPROB, an XPROBLEM instance
+;;           HEURISTIC, a (domain dependent) heuristic function to apply to nodes
+;;  OUTPUT:  A goal node or NIL.
+
+(defun xids-astar (xprob &key (heuristic #'manhattan-h))
+  ;; Call XIDS on XPROB with a VALUE-FUNC that computes F(n) = G(n) + H(n)
+  (xids xprob :value-func #'(lambda (xnode)
+				;; cost + heuristic
+			      (+ (xnode-cost xnode) (funcall heuristic (xnode-state xnode)))
+			      )))
+
+
+

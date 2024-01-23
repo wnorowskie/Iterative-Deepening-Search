@@ -1,0 +1,142 @@
+CMPU-365, Spring 2023
+Instructions for Asmt. 2
+Due:  Saturday, Feb. 25 @ 5pm
+
+
+For this assignment you are encouraged to work in pairs.
+You should write the name of the person you work with at the top
+of your submitted printouts.
+
+PART 1.
+
+  Implementing extended Iterative Deepening Search (IDS) that uses the "value" of each
+  node to determine whether it has reached (or exceeded) the cutoff limit.  For example,
+  if the value of a node equals its depth, then we get ordinary IDS search.  But if the
+  value equals the "cost so far", then we get Uniform Cost Search (UCS).  And if the
+  value of a node n is f(n) = g(n) + h(n), then we get IDA* search.
+
+  Create a directory in your CS dept account called your-name-asmt2.
+  CD into that directory and then download all of the files from the cs365 account
+  into it using the following command:
+
+     cp  -r  ~cs365/public_html/asmts/2023-asmt2-xids/*  .
+
+  Start up an ACLEMACS session as usual and at the Lisp prompt, type:
+
+     (load "testing")
+
+  It should compile and load all files needed for this assignment.  However, the
+  test results will not be satisfying since some functionality is missing:  to be
+  provided by you!
+
+  ---------------------
+   basic-defns.lisp
+  ---------------------
+
+  This file defines some new structs that are similar to those used in
+  asmt1.  The differences include:
+
+      XPROBLEM:  only includes one field:  INIT-STATE
+        that's because each domain is required to implement various
+        methods such as STATE-IS-GOAL?, STATES-ARE-EQUAL?, FETCH-LEGAL-MOVES,
+        and DO-MOVE.
+
+      XNODE:  includes new fields:  COST (i.e., cost so far from root node to this node)
+                                   VALUE (could be DEPTH, COST or F-value)
+
+      RESULTS:  distinguishes num-nodes-explored and num-nodes-generated.
+ 
+    Notice that the following functions are defined for you:
+
+      MAKE-ROOT-XNODE, XCYCLE? (notice the use of STATES-ARE-EQUAL?), XBUILD-PATH
+
+  ----------------------
+   xida.lisp
+  ----------------------
+
+  This file defines the following functions, at least partially:
+
+      XEXPAND:  The structure of this function is defined for you, but you must
+                provide the body of Case 2, where you call the DO-MOVE function
+		on the current state to get the child state and then create the
+		corresponding child XNODE.  After doing so, set the VALUE field
+		of that new XNODE using the VALUE-FUNC.  (Notice that the VALUE-FUNC
+		is provided as a keyword input to XEXPAND.)
+
+      XDLS:  The structure of this function is defined for you, but you must
+             implement the body of the XDLS-REC tail-recursive helper function.
+	     This should implement depth-limited search, using the VALUE field
+	     of each XNODE to determine whether it has reached (or exceeeded)
+	     the cutoff.  It should call XEXPAND to generate the child XNODES
+	     of the given node.  It should also compute MIN-VALUE-OF-UNEXPLORED-
+	     CHILDREN, as discussed in the pseudocode discussed in class.
+
+      XIDS:  This is the wrapper function for iterative deepening search.
+             It is defined for you.  It iteratively calls XDLS with an appropriate
+	     cutoff until a goal is found or the search space has been exhausted.
+             Notice that VALUE-FUNC must be provided as a keyword input.
+	     
+      XIDS-ASTAR:  This is a wrapper function that calls XIDS on an XPROBLEM
+                   struct with a particular VALUE-FUNC.  It takes a heuristic
+		   function as a keyword input.  The VALUE-FUNC provided to XIDS
+		   must be defined by you!  It's not complicated!  You just need
+		   to compute f(n) = h(n) + g(n), not 0!
+
+  -------------------------------
+    xeights.lisp
+  -------------------------------
+
+    A re-implementation of the EIGHTS tile-puzzle domain along the lines of what we discussed
+    in class.  It defines the following structs and functions/methods:
+
+       EIGHTS -- for the current state of the puzzle
+
+       EIGHTS-MOVE -- enough info to specify a particular move
+
+       STATES-ARE-EQUAL? and STATE-IS-GOAL? methods
+
+       FETCH-LEGAL-MOVES and DO-MOVE methods
+
+    The above methods will be useful when you are completing the definitions of XEXPAND and XDLS.
+
+       MAKE-RANDOM-EIGHTS, as seen before.
+
+  ---------------------
+    cities.lisp
+  ---------------------
+
+     An implementation of the Romanian cities domain, as discussed in class.
+
+  ---------------------
+    testing.lisp
+  ---------------------
+
+     Gives examples of how to call the XIDS and XIDS-ASTAR functions for the
+     EIGHTS and CITIES domains.
+
+
+PART 2.
+
+  Create a new file, called XFIFTEENS.LISP, that implements the 15-tile puzzle.
+  It's a 4x4 array containing 15 tiles and one blank.  You should mimic the
+  implementation of the eights tile-puzzle domain.  Be sure to implement the
+  manhattan heuristic for 15-tile-puzzle too.
+
+  Then test the IDA* algorithm on the 15-tile puzzle domain.
+
+============================
+
+  When you are done, print out the following files:
+
+     xida.lisp  --  with your completed xexpand and xdls functions
+     xfifteens.lisp -- with your implementation of the 15-tile-puzzle domain
+     test-results.txt  --  the results of your tests as a plain text file
+         with all extraneous text deleted.
+
+  Staple them together in that order.
+
+  Then submit using submit365 as usual:
+
+     submit365  asmt2  whatever_you_called_your_asmt2_directory
+
+
